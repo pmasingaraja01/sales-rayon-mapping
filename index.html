@@ -20,7 +20,8 @@ select,input,button{width:100%;height:40px;border:1px solid #d8dee9;border-radiu
 button{background:#2563eb;color:white;border:0;font-weight:700;cursor:pointer;margin-top:12px}
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:14px}
 .kpi{background:#f7f9fc;border:1px solid #e5eaf2;border-radius:12px;padding:12px}.num{font-size:22px;font-weight:800}.lbl{font-size:11px;color:#65738a;margin-top:5px}
-.footer{margin-top:18px;padding:12px 4px 2px;border-top:1px solid #e8ecf2;text-align:center;color:#7a8799;font-size:10px;line-height:1.5}.footer b{color:#516078}.box{margin-top:14px;padding:12px;border:1px solid #e5eaf2;border-radius:12px;background:#fff;font-size:12px;line-height:1.5}
+/* Multi-select Salesman / Compare */
+.multi{position:relative}.multi-btn{display:flex;align-items:center;justify-content:space-between;width:100%;height:40px;border:1px solid #d8dee9;border-radius:9px;background:white;padding:0 11px;font-size:13px;color:#172033;cursor:pointer}.multi-btn .muted{color:#65738a}.multi-panel{display:none;position:absolute;left:0;right:0;top:44px;background:#fff;border:1px solid #d8dee9;border-radius:10px;box-shadow:0 10px 25px #0002;z-index:1200;max-height:300px;overflow:auto;padding:8px}.multi.open .multi-panel{display:block}.multi-tools{display:flex;gap:6px;margin-bottom:7px}.multi-tools button{height:32px;margin:0;background:#f1f5f9;color:#334155;border:1px solid #d8dee9;font-size:11px;padding:0 8px}.multi-item{display:flex;align-items:center;gap:8px;padding:8px 6px;border-radius:7px;font-size:12px;cursor:pointer}.multi-item:hover{background:#f7f9fc}.multi-item input{width:15px;height:15px;margin:0}.sales-count{font-size:11px;color:#64748b;margin-top:5px}.compare-table{width:100%;border-collapse:collapse;margin-top:8px;font-size:11px}.compare-table th,.compare-table td{padding:6px 4px;border-bottom:1px solid #edf0f5;text-align:left;vertical-align:top}.compare-table th{font-weight:700;color:#516078}.sales-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px}.compare-scroll{overflow:auto;max-height:260px}.footer{margin-top:18px;padding:12px 4px 2px;border-top:1px solid #e8ecf2;text-align:center;color:#7a8799;font-size:10px;line-height:1.5}.footer b{color:#516078}.box{margin-top:14px;padding:12px;border:1px solid #e5eaf2;border-radius:12px;background:#fff;font-size:12px;line-height:1.5}
 .error{background:#fff7ed;border-color:#fed7aa;color:#9a3412}.ok{background:#ecfdf5;border-color:#a7f3d0;color:#166534}
 .legend{display:flex;align-items:center;gap:7px;margin:6px 0}.sw{width:12px;height:12px;border-radius:50%;border:1px solid #fff;box-shadow:0 0 0 1px #ccc}
 .detail{position:absolute;right:14px;bottom:14px;width:310px;max-width:calc(100% - 28px);background:white;border-radius:14px;box-shadow:0 8px 28px #0002;padding:14px;display:none;z-index:1000}
@@ -38,7 +39,18 @@ button{background:#2563eb;color:white;border:0;font-weight:700;cursor:pointer;ma
 <div class="layout">
 <aside>
 <label>AREA</label><select id="area"><option value="">Semua Area</option></select>
-<label>SALESMAN / RAYON</label><select id="sales"><option value="">Semua Salesman</option></select>
+<label>SALESMAN / RAYON</label>
+<div class="multi" id="salesMulti">
+  <button type="button" class="multi-btn" id="salesBtn"><span class="muted">Semua Salesman</span><span>▾</span></button>
+  <div class="multi-panel" id="salesPanel">
+    <div class="multi-tools">
+      <button type="button" id="salesAll">Pilih Semua</button>
+      <button type="button" id="salesNone">Kosongkan</button>
+    </div>
+    <div id="salesOptions"></div>
+  </div>
+</div>
+<div class="sales-count" id="salesCount">Semua salesman ditampilkan</div>
 <label>HARI</label><select id="hari"><option value="">Semua Hari</option></select>
 <label>CYCLE</label><select id="cycle"><option value="">Semua Cycle</option></select>
 <label>KECAMATAN</label><select id="kec"><option value="">Semua Kecamatan</option></select>
@@ -53,6 +65,14 @@ button{background:#2563eb;color:white;border:0;font-weight:700;cursor:pointer;ma
 </div>
 <div class="box"><b>Database</b><br>Google Sheet: MASTER_SALES_RAYON_MAPPING_BALI_NUSRA_V1<br>Worksheet: DATA_OUTLET</div>
 <div class="box"><b>Legenda Rayon</b><div id="legend"></div></div>
+<div class="box" id="compareBox" style="display:none">
+  <b>COMPARE SALESMAN / RAYON</b>
+  <div class="small" style="margin-top:4px">Perbandingan outlet, route, hari dan cycle dari salesman yang dipilih.</div>
+  <div class="compare-scroll"><table class="compare-table">
+    <thead><tr><th>Salesman</th><th>Outlet</th><th>Route</th><th>Hari</th><th>Cycle</th></tr></thead>
+    <tbody id="compareBody"></tbody>
+  </table></div>
+</div>
 <div class="footer">
 <b>Sales Rayon Mapping v1.0</b><br>
 © 2026 Jabler • Data Source: Google Sheets<br>
@@ -69,7 +89,7 @@ Developed by Jabler
 <script>
 const SHEET_ID="1E2Nh6RMaUK4HB--_nEMOERezFwsUInMMk-tJ_m5pbKg";
 const GID="165587377";
-let rows=[], filtered=[], markers=[], map, canvasRenderer;
+let rows=[], filtered=[], markers=[], map, canvasRenderer, selectedSales=[];
 
 const colors=["#2563eb","#dc2626","#16a34a","#9333ea","#ea580c","#0891b2","#db2777","#7c3aed","#059669","#ca8a04","#be123c"];
 let colorMap={};
@@ -112,22 +132,76 @@ function fail(e){
  setStatus("<b>Koneksi Google Sheets gagal.</b><br>Pastikan spreadsheet sudah Publish to web dan akses Viewer. Detail: "+e.message);
 }
 
-function vals(field){return [...new Set(rows.map(r=>String(pick(r,aliases[field]))).filter(Boolean))].sort((a,b)=>a.localeCompare(b,"id"))}
+function vals(field){
+ const values=[...new Set(rows.map(r=>String(pick(r,aliases[field]))).filter(Boolean))];
+ if(field==="hari"){
+   const order=["Senin","Selasa","Rabu","Kamis","Jumat","Sabtu","Minggu"];
+   return values.sort((a,b)=>{
+     const ia=order.findIndex(x=>x.toLowerCase()===a.toLowerCase());
+     const ib=order.findIndex(x=>x.toLowerCase()===b.toLowerCase());
+     if(ia===-1 && ib===-1) return a.localeCompare(b,"id");
+     if(ia===-1) return 1;
+     if(ib===-1) return -1;
+     return ia-ib;
+   });
+ }
+ return values.sort((a,b)=>a.localeCompare(b,"id"));
+}
 function fill(id,arr,first){
  const el=document.getElementById(id), old=el.value;el.innerHTML=`<option value="">${first}</option>`;
  arr.forEach(v=>{const o=document.createElement("option");o.value=v;o.textContent=v;el.appendChild(o)});
  if(arr.includes(old))el.value=old;
 }
 function setupFilters(){
- fill("area",vals("area"),"Semua Area");fill("sales",vals("sales"),"Semua Salesman");
+ fill("area",vals("area"),"Semua Area");renderSalesOptions();
  fill("hari",vals("hari"),"Semua Hari");fill("cycle",vals("cycle"),"Semua Cycle");fill("kec",vals("kec"),"Semua Kecamatan");
 }
+function renderSalesOptions(){
+ const el=document.getElementById("salesOptions");
+ const all=vals("sales");
+ el.innerHTML=all.map((s,i)=>{
+   const id="sales_"+i, checked=selectedSales.includes(s)?" checked":"";
+   return `<label class="multi-item" for="${id}"><input type="checkbox" id="${id}" value="${escapeHtml(s)}"${checked}><span class="sales-dot" style="background:${getColor(s)}"></span><span>${escapeHtml(s)}</span></label>`;
+ }).join("")||"<div class='small' style='padding:8px'>Belum ada salesman.</div>";
+ el.querySelectorAll('input[type="checkbox"]').forEach(cb=>cb.addEventListener("change",()=>{
+   selectedSales=[...el.querySelectorAll('input:checked')].map(x=>x.value);
+   updateSalesButton(); apply();
+ }));
+ updateSalesButton();
+}
+function escapeHtml(v){
+ return String(v??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
+}
+function updateSalesButton(){
+ const btn=document.getElementById("salesBtn"), count=document.getElementById("salesCount");
+ const label=btn.querySelector("span:first-child");
+ if(!selectedSales.length){label.textContent="Semua Salesman";label.className="muted";count.textContent="Semua salesman ditampilkan";}
+ else if(selectedSales.length===1){label.textContent=selectedSales[0];label.className="";count.textContent="1 salesman dipilih";}
+ else {label.textContent=selectedSales.length+" salesman dipilih";label.className="";count.textContent="Mode compare aktif • "+selectedSales.length+" salesman";}
+}
+function setSalesSelection(list){
+ selectedSales=[...list];
+ document.querySelectorAll('#salesOptions input[type="checkbox"]').forEach(cb=>cb.checked=selectedSales.includes(cb.value));
+ updateSalesButton(); apply();
+}
+function renderCompare(){
+ const box=document.getElementById("compareBox"), body=document.getElementById("compareBody");
+ if(selectedSales.length<2){box.style.display="none";body.innerHTML="";return}
+ box.style.display="block";
+ body.innerHTML=selectedSales.map(s=>{
+   const rr=filtered.filter(r=>String(pick(r,aliases.sales))===s);
+   const routes=[...new Set(rr.map(r=>String(pick(r,aliases.route))).filter(Boolean))];
+   const days=[...new Set(rr.map(r=>String(pick(r,aliases.hari))).filter(Boolean))];
+   const cycles=[...new Set(rr.map(r=>String(pick(r,aliases.cycle))).filter(Boolean))];
+   return `<tr><td><span class="sales-dot" style="background:${getColor(s)}"></span>${escapeHtml(s)}</td><td><b>${rr.length}</b></td><td>${routes.length}</td><td>${escapeHtml(days.join(", ")||"-")}</td><td>${escapeHtml(cycles.join(", ")||"-")}</td></tr>`;
+ }).join("");
+}
 function apply(){
- const a=document.getElementById("area").value,s=document.getElementById("sales").value,h=document.getElementById("hari").value,c=document.getElementById("cycle").value,k=document.getElementById("kec").value,q=norm(document.getElementById("search").value);
+ const a=document.getElementById("area").value,h=document.getElementById("hari").value,c=document.getElementById("cycle").value,k=document.getElementById("kec").value,q=norm(document.getElementById("search").value);
  filtered=rows.filter(r=>{
-   return (!a||String(pick(r,aliases.area))===a)&&(!s||String(pick(r,aliases.sales))===s)&&(!h||String(pick(r,aliases.hari))===h)&&(!c||String(pick(r,aliases.cycle))===c)&&(!k||String(pick(r,aliases.kec))===k)&&(!q||norm(pick(r,aliases.kd)).includes(q)||norm(pick(r,aliases.nama)).includes(q))
+   return (!a||String(pick(r,aliases.area))===a)&&(!selectedSales.length||selectedSales.includes(String(pick(r,aliases.sales))))&&(!h||String(pick(r,aliases.hari))===h)&&(!c||String(pick(r,aliases.cycle))===c)&&(!k||String(pick(r,aliases.kec))===k)&&(!q||norm(pick(r,aliases.kd)).includes(q)||norm(pick(r,aliases.nama)).includes(q))
  });
- draw();kpis();title();
+ draw();kpis();title();renderCompare();
 }
 function title(){
  const a=document.getElementById("area").value;
@@ -172,7 +246,11 @@ function initMap(){
  }).addTo(map);
  map.on("movestart",()=>window.userMoved=true);
 }
-["area","sales","hari","cycle","kec"].forEach(id=>document.getElementById(id).addEventListener("change",apply));
+["area","hari","cycle","kec"].forEach(id=>document.getElementById(id).addEventListener("change",apply));
+document.getElementById("salesBtn").addEventListener("click",()=>document.getElementById("salesMulti").classList.toggle("open"));
+document.getElementById("salesAll").addEventListener("click",()=>setSalesSelection(vals("sales")));
+document.getElementById("salesNone").addEventListener("click",()=>setSalesSelection([]));
+document.addEventListener("click",e=>{const m=document.getElementById("salesMulti");if(!m.contains(e.target))m.classList.remove("open")});
 document.getElementById("search").addEventListener("input",apply);
 document.getElementById("reload").addEventListener("click",loadData);
 initMap();loadData();
