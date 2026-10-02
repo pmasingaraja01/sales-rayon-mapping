@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sales Rayon Mapping — Bali Nusra</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+*{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;background:#f5f7fb;color:#172033}
+header{height:82px;background:#102044;color:white;padding:16px 22px;display:flex;align-items:center;gap:14px}
+.logo{width:44px;height:44px;border-radius:12px;background:#2563eb;display:grid;place-items:center;font-size:24px;font-weight:800}
+h1{font-size:21px;margin:0}.sub{font-size:12px;opacity:.8;margin-top:5px}.conn{margin-left:auto;font-size:13px}
+.dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:#f59e0b;margin-right:7px}
+.layout{display:grid;grid-template-columns:360px 1fr;height:calc(100vh - 82px)}
+aside{background:white;border-right:1px solid #e4e8ef;padding:16px;overflow:auto}
+main{min-width:0;position:relative}
+#map{height:100%;width:100%}
+label{display:block;font-size:12px;font-weight:700;margin:11px 0 6px;color:#516078}
+select,input,button{width:100%;height:40px;border:1px solid #d8dee9;border-radius:9px;background:white;padding:0 11px;font-size:13px}
+button{background:#2563eb;color:white;border:0;font-weight:700;cursor:pointer;margin-top:12px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:14px}
+.kpi{background:#f7f9fc;border:1px solid #e5eaf2;border-radius:12px;padding:12px}.num{font-size:22px;font-weight:800}.lbl{font-size:11px;color:#65738a;margin-top:5px}
+.footer{margin-top:18px;padding:12px 4px 2px;border-top:1px solid #e8ecf2;text-align:center;color:#7a8799;font-size:10px;line-height:1.5}.footer b{color:#516078}.box{margin-top:14px;padding:12px;border:1px solid #e5eaf2;border-radius:12px;background:#fff;font-size:12px;line-height:1.5}
+.error{background:#fff7ed;border-color:#fed7aa;color:#9a3412}.ok{background:#ecfdf5;border-color:#a7f3d0;color:#166534}
+.legend{display:flex;align-items:center;gap:7px;margin:6px 0}.sw{width:12px;height:12px;border-radius:50%;border:1px solid #fff;box-shadow:0 0 0 1px #ccc}
+.detail{position:absolute;right:14px;bottom:14px;width:310px;max-width:calc(100% - 28px);background:white;border-radius:14px;box-shadow:0 8px 28px #0002;padding:14px;display:none;z-index:1000}
+.detail b{font-size:15px}.small{font-size:12px;color:#5d6b80;line-height:1.55}.nav{display:block;text-align:center;background:#16a34a;color:white;padding:10px;border-radius:9px;text-decoration:none;font-weight:700;margin-top:10px}
+@media(max-width:800px){header{height:70px;padding:12px 15px}.layout{display:flex;flex-direction:column;height:auto}.layout aside{order:1;height:auto;border-right:0;border-bottom:1px solid #ddd}.layout main{order:2;height:58vh;min-height:430px}h1{font-size:17px}.conn{font-size:11px}.logo{width:38px;height:38px}}
+</style>
+</head>
+<body>
+<header>
+<div class="logo">S</div>
+<div><h1 id="title">SALES RAYON MAPPING — BALI NUSRA</h1><div class="sub">Google Sheets Connected • Mobile Ready</div></div>
+<div class="conn" id="conn"><span class="dot"></span>Belum terhubung</div>
+</header>
+
+<div class="layout">
+<aside>
+<label>AREA</label><select id="area"><option value="">Semua Area</option></select>
+<label>SALESMAN / RAYON</label><select id="sales"><option value="">Semua Salesman</option></select>
+<label>HARI</label><select id="hari"><option value="">Semua Hari</option></select>
+<label>CYCLE</label><select id="cycle"><option value="">Semua Cycle</option></select>
+<label>KECAMATAN</label><select id="kec"><option value="">Semua Kecamatan</option></select>
+<label>CARI OUTLET</label><input id="search" placeholder="Kode / nama outlet...">
+<button id="reload">↻ Muat Ulang Data</button>
+<div id="status" class="box error"><b>Data belum termuat.</b><br>Memuat data dari Google Sheets...</div>
+<div class="grid">
+<div class="kpi"><div class="num" id="nOutlet">0</div><div class="lbl">Outlet</div></div>
+<div class="kpi"><div class="num" id="nSales">0</div><div class="lbl">Salesman</div></div>
+<div class="kpi"><div class="num" id="nRoute">0</div><div class="lbl">Route</div></div>
+<div class="kpi"><div class="num" id="nCycle">0</div><div class="lbl">Cycle</div></div>
+</div>
+<div class="box"><b>Database</b><br>Google Sheet: MASTER_SALES_RAYON_MAPPING_BALI_NUSRA_V1<br>Worksheet: DATA_OUTLET</div>
+<div class="box"><b>Legenda Rayon</b><div id="legend"></div></div>
+<div class="footer">
+<b>Sales Rayon Mapping v1.0</b><br>
+© 2026 Jabler • Data Source: Google Sheets<br>
+Developed by Jabler
+</div>
+</aside>
+<main>
+<div id="map"></div>
+<div id="detail" class="detail"></div>
+</main>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const SHEET_ID="1E2Nh6RMaUK4HB--_nEMOERezFwsUInMMk-tJ_m5pbKg";
+const GID="165587377";
+let rows=[], filtered=[], markers=[], map, canvasRenderer;
+
+const colors=["#2563eb","#dc2626","#16a34a","#9333ea","#ea580c","#0891b2","#db2777","#7c3aed","#059669","#ca8a04","#be123c"];
+let colorMap={};
+
+const aliases={
+ area:["AREA"], kd:["KD OUTLET","KD_OUTLET"], nama:["NAMA OUTLET","NAMA_OUTLET"], alamat:["ALAMAT"],
+ kec:["KECAMATAN"], sales:["NAMA_SLS TO BE","NAMA SLS TO BE","NAMA SALESMAN"], kdsls:["KD_SLS TO BE","KD SLS TO BE"],
+ route:["RUTE TO BE","RUTE TO BE"], hari:["HARI"], cycle:["CYCLE TO BE","CYCLE TO BE"],
+ lat:["Location Latitude","LOCATION LATITUDE","LATITUDE","LAT"], lon:["Location Longitude","LOCATION LONGITUDE","LONGITUDE","LON","LNG"]
+};
+
+function norm(s){return String(s??"").trim().toUpperCase()}
+function pick(o,names){for(const n of names){const k=norm(n);if(o[k]!==undefined)return o[k]}return""}
+function setStatus(msg,ok=false){const e=document.getElementById("status");e.className="box "+(ok?"ok":"error");e.innerHTML=msg}
+
+function loadData(){
+ setStatus("Menghubungkan ke Google Sheets...");
+ document.getElementById("conn").innerHTML='<span class="dot"></span>Memuat...';
+ const cb="gsCallback_"+Date.now();
+ window[cb]=data=>{
+   try{
+     const table=data.table, cols=table.cols.map(c=>norm(c.label));
+     rows=table.rows.map(r=>{
+       const o={};cols.forEach((c,i)=>o[c]=r.c[i]?.v??"");return o
+     });
+     rows=rows.filter(r=>Number(pick(r,aliases.lat)) && Number(pick(r,aliases.lon)));
+     document.getElementById("conn").innerHTML='<span class="dot" style="background:#22c55e"></span>Terhubung';
+     setStatus("<b>Google Sheets terhubung.</b><br>"+rows.length.toLocaleString("id-ID")+" outlet dengan koordinat terbaca.",true);
+     setupFilters(); apply();
+   }catch(e){fail(e)}
+   delete window[cb];
+ };
+ const script=document.createElement("script");
+ script.onerror=()=>fail(new Error("Endpoint Google Sheets tidak dapat diakses."));
+ script.src=`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json;responseHandler:${cb}&gid=${GID}`;
+ document.body.appendChild(script);
+}
+function fail(e){
+ document.getElementById("conn").innerHTML='<span class="dot"></span>Belum terhubung';
+ setStatus("<b>Koneksi Google Sheets gagal.</b><br>Pastikan spreadsheet sudah Publish to web dan akses Viewer. Detail: "+e.message);
+}
+
+function vals(field){return [...new Set(rows.map(r=>String(pick(r,aliases[field]))).filter(Boolean))].sort((a,b)=>a.localeCompare(b,"id"))}
+function fill(id,arr,first){
+ const el=document.getElementById(id), old=el.value;el.innerHTML=`<option value="">${first}</option>`;
+ arr.forEach(v=>{const o=document.createElement("option");o.value=v;o.textContent=v;el.appendChild(o)});
+ if(arr.includes(old))el.value=old;
+}
+function setupFilters(){
+ fill("area",vals("area"),"Semua Area");fill("sales",vals("sales"),"Semua Salesman");
+ fill("hari",vals("hari"),"Semua Hari");fill("cycle",vals("cycle"),"Semua Cycle");fill("kec",vals("kec"),"Semua Kecamatan");
+}
+function apply(){
+ const a=document.getElementById("area").value,s=document.getElementById("sales").value,h=document.getElementById("hari").value,c=document.getElementById("cycle").value,k=document.getElementById("kec").value,q=norm(document.getElementById("search").value);
+ filtered=rows.filter(r=>{
+   return (!a||String(pick(r,aliases.area))===a)&&(!s||String(pick(r,aliases.sales))===s)&&(!h||String(pick(r,aliases.hari))===h)&&(!c||String(pick(r,aliases.cycle))===c)&&(!k||String(pick(r,aliases.kec))===k)&&(!q||norm(pick(r,aliases.kd)).includes(q)||norm(pick(r,aliases.nama)).includes(q))
+ });
+ draw();kpis();title();
+}
+function title(){
+ const a=document.getElementById("area").value;
+ document.getElementById("title").textContent="SALES RAYON MAPPING — "+(a?("AREA "+a):"BALI NUSRA");
+}
+function kpis(){
+ document.getElementById("nOutlet").textContent=filtered.length.toLocaleString("id-ID");
+ document.getElementById("nSales").textContent=new Set(filtered.map(r=>pick(r,aliases.sales)).filter(Boolean)).size;
+ document.getElementById("nRoute").textContent=new Set(filtered.map(r=>pick(r,aliases.route)).filter(Boolean)).size;
+ document.getElementById("nCycle").textContent=new Set(filtered.map(r=>pick(r,aliases.cycle)).filter(Boolean)).size;
+}
+function getColor(s){
+ s=String(s||"Tanpa Salesman");if(!colorMap[s])colorMap[s]=colors[Object.keys(colorMap).length%colors.length];return colorMap[s]
+}
+function draw(){
+ markers.forEach(m=>m.remove());markers=[];
+ const bounds=[];
+ filtered.forEach(r=>{
+   const lat=Number(pick(r,aliases.lat)),lon=Number(pick(r,aliases.lon));if(!isFinite(lat)||!isFinite(lon))return;
+   const sales=pick(r,aliases.sales), color=getColor(sales);
+   const m=L.circleMarker([lat,lon],{renderer:canvasRenderer,radius:6,weight:1,color:"#fff",fillColor:color,fillOpacity:.9});
+   m.bindTooltip(String(pick(r,aliases.nama)||pick(r,aliases.kd)),{direction:"top"});
+   m.on("click",()=>showDetail(r,lat,lon));m.addTo(map);markers.push(m);bounds.push([lat,lon]);
+ });
+ if(bounds.length&&!window.userMoved)map.fitBounds(bounds,{padding:[25,25],maxZoom:14});
+ renderLegend();
+}
+function renderLegend(){
+ const el=document.getElementById("legend"), seen=[...new Set(filtered.map(r=>String(pick(r,aliases.sales))).filter(Boolean))].slice(0,15);
+ el.innerHTML=seen.map(s=>`<div class="legend"><span class="sw" style="background:${getColor(s)}"></span>${s}</div>`).join("")||"<div class='small'>Belum ada data.</div>";
+}
+function showDetail(r,lat,lon){
+ const nama=pick(r,aliases.nama)||"-",kd=pick(r,aliases.kd)||"-",alamat=pick(r,aliases.alamat)||"-";
+ const url=`https://www.google.com/maps/dir/?api=1&destination=${lat},${lon}`;
+ const d=document.getElementById("detail");d.style.display="block";
+ d.innerHTML=`<b>${nama}</b><div class="small" style="margin-top:7px">Kode: ${kd}<br>${alamat}<br>Kecamatan: ${pick(r,aliases.kec)||"-"}<br>Salesman: ${pick(r,aliases.sales)||"-"}<br>Hari: ${pick(r,aliases.hari)||"-"} • Cycle: ${pick(r,aliases.cycle)||"-"}<br>Koordinat: ${lat}, ${lon}</div><a class="nav" target="_blank" href="${url}">Navigasi Google Maps</a>`;
+}
+function initMap(){
+ map=L.map("map",{preferCanvas:true}).setView([-8.115,115.09],11);canvasRenderer=L.canvas();
+ L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}",{
+   maxZoom:19,attribution:"&copy; Esri, HERE, Garmin, Intermap, increment P Corp., GEBCO, USGS, FAO, NPS"
+ }).addTo(map);
+ map.on("movestart",()=>window.userMoved=true);
+}
+["area","sales","hari","cycle","kec"].forEach(id=>document.getElementById(id).addEventListener("change",apply));
+document.getElementById("search").addEventListener("input",apply);
+document.getElementById("reload").addEventListener("click",loadData);
+initMap();loadData();
+</script>
+</body>
+</html>
